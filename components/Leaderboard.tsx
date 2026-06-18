@@ -23,15 +23,21 @@ export default function Leaderboard({ onClose }: { onClose: () => void }) {
     async function fetchScores() {
       try {
         setLoading(true);
+        const latestBlock = await publicClient.getBlockNumber();
+        const fromBlock = latestBlock > 100000n
+          ? latestBlock - 100000n
+          : 0n;
+
         const logs = await publicClient.getLogs({
           address: DINO_CONTRACT_ADDRESS,
           event: parseAbiItem(
             "event ScoreSubmitted(address indexed player, uint256 score, uint256 timestamp)"
           ),
-          fromBlock: "earliest",
+          fromBlock,
           toBlock: "latest",
         });
 
+        // Dedupe by address, keep each player's best score
         const best: Record<string, number> = {};
         for (const log of logs) {
           const player = (log.args.player as string).toLowerCase();
