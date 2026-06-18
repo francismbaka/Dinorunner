@@ -21,6 +21,7 @@ export default function Leaderboard({ onClose }: { onClose: () => void }) {
     let cancelled = false;
 
     async function fetchScores() {
+       if (!publicClient) return;
       try {
         setLoading(true);
         const latestBlock = await publicClient.getBlockNumber();
