@@ -249,7 +249,7 @@ export default function Home() {
 
   const canvasRef      = useRef<HTMLCanvasElement>(null);
   const containerRef   = useRef<HTMLDivElement>(null);
-  const animFrameRef   = useRef<number>();
+  const animFrameRef   = useRef<number | undefined>(undefined);
   const isRunningRef   = useRef(false);
   const displaySyncRef = useRef(0);
   const jumpRef        = useRef<() => void>(() => {});
