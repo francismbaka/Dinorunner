@@ -772,58 +772,78 @@ export default function Home() {
   }, [resetWrite]);
 
   // ─── Keyboard ──────────────────────────────────────────────────────────────
-  useEffect(() => {
-    isRunningRef.current = true;
-    animFrameRef.current = requestAnimationFrame(gameLoop);
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.code === "Space")                          { e.preventDefault(); jumpRef.current(); }
-      if (e.code === "ArrowDown" || e.code === "KeyS") { e.preventDefault(); duckStartRef.current(); }
-    };
-    const onKeyUp = (e: KeyboardEvent) => {
-      if (e.code === "ArrowDown" || e.code === "KeyS") { e.preventDefault(); duckEndRef.current(); }
-    };
-    window.addEventListener("keydown", onKeyDown);
-    window.addEventListener("keyup",   onKeyUp);
-    return () => {
-      isRunningRef.current = false;
-      if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
-      window.removeEventListener("keydown", onKeyDown);
-      window.removeEventListener("keyup",   onKeyUp);
-    };
-  }, [gameLoop]);
+useEffect(() => {
+  isRunningRef.current = true;
 
-  // ─── Touch ─────────────────────────────────────────────────────────────────
-  const handleTouchStart = useCallback((e: React.TouchEvent) => {
-    const t = e.touches[0];
-    touchStartY.current = t.clientY; touchStartTime.current = Date.now(); touchActedRef.current = false;
-  }, []);
-
-  const handleTouchMove = useCallback((e: React.TouchEvent) => {
-    if (touchActedRef.current) return;
-    const t = e.touches[0];
-    const dy = t.clientY - touchStartY.current;
-    const dt = Date.now() - touchStartTime.current;
-    if (dy > 30 && dt < 400) {
-      touchActedRef.current = true;
-      const g = gameStateRef.current;
-      if (!g.ducking && !mutedRef.current) audioRef.current?.playDuck();
-      g.ducking = true; g.duckTimer = DUCK_FRAMES;
+  // Wait for canvas to be measured before starting loop (fixes mobile blank screen)
+  const waitForCanvas = () => {
+    if (canvasH.current === 0) {
+      requestAnimationFrame(waitForCanvas);
+      return;
     }
-  }, []);
+    animFrameRef.current = requestAnimationFrame(gameLoop);
+  };
+  waitForCanvas();
 
-  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
-    e.preventDefault();
-    if (!touchActedRef.current) jumpRef.current();
-    touchActedRef.current = false;
-  }, []);
+  const onKeyDown = (e: KeyboardEvent) => {
+    if (e.code === "Space")                          { e.preventDefault(); jumpRef.current(); }
+    if (e.code === "ArrowDown" || e.code === "KeyS") { e.preventDefault(); duckStartRef.current(); }
+  };
+  const onKeyUp = (e: KeyboardEvent) => {
+    if (e.code === "ArrowDown" || e.code === "KeyS") { e.preventDefault(); duckEndRef.current(); }
+  };
+  window.addEventListener("keydown", onKeyDown);
+  window.addEventListener("keyup",   onKeyUp);
+  return () => {
+    isRunningRef.current = false;
+    if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
+    window.removeEventListener("keydown", onKeyDown);
+    window.removeEventListener("keyup",   onKeyUp);
+  };
+}, [gameLoop]);
 
-  const handleClick = useCallback((e: React.MouseEvent) => {
-    e.preventDefault(); jumpRef.current();
-  }, []);
+// ─── Touch ─────────────────────────────────────────────────────────────────
+const handleTouchStart = useCallback((e: React.TouchEvent) => {
+  // Don't preventDefault here — lets scroll and gestures work naturally
+  const t = e.touches[0];
+  touchStartY.current    = t.clientY;
+  touchStartTime.current = Date.now();
+  touchActedRef.current  = false;
+}, []);
 
-  const toggleMute = useCallback(() => {
-    const next = !mutedRef.current; mutedRef.current = next; setMuted(next);
-  }, []);
+const handleTouchMove = useCallback((e: React.TouchEvent) => {
+  e.preventDefault(); // Prevent page scroll while swiping down to duck
+  if (touchActedRef.current) return;
+  const t  = e.touches[0];
+  const dy = t.clientY - touchStartY.current;
+  const dx = Math.abs(t.clientX - touchStartY.current); // ignore horizontal swipes
+  const dt = Date.now() - touchStartTime.current;
+  // Only trigger duck on deliberate downward swipe, not accidental touch drift
+  if (dy > 25 && dy > dx && dt < 350) {
+    touchActedRef.current = true;
+    const g = gameStateRef.current;
+    if (!g.ducking && !mutedRef.current) audioRef.current?.playDuck();
+    g.ducking   = true;
+    g.duckTimer = DUCK_FRAMES;
+  }
+}, []);
+
+const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+  e.preventDefault();
+  if (!touchActedRef.current) jumpRef.current();
+  touchActedRef.current = false;
+}, []);
+
+const handleClick = useCallback((e: React.MouseEvent) => {
+  e.preventDefault();
+  jumpRef.current();
+}, []);
+
+const toggleMute = useCallback(() => {
+  const next = !mutedRef.current;
+  mutedRef.current = next;
+  setMuted(next);
+}, []);
 
   // ─── Submit score — fire the write, show "Submitted" the instant the
   //     wallet returns a hash. No more in-app receipt detection. ─────────────
