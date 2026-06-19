@@ -294,7 +294,10 @@ export default function Home() {
     const insets = context?.client?.safeAreaInsets ?? { top: 0, bottom: 0, left: 0, right: 0 };
     const W    = container.offsetWidth;
     const maxH = window.innerHeight - insets.top - insets.bottom - 60;
-    const H    = Math.min(maxH, Math.floor(W * 0.55));
+    const isMobile = W <= 430;
+    const H = isMobile
+      ? Math.min(maxH, Math.floor(window.innerHeight * 0.78))
+      : Math.min(maxH, Math.floor(W * 0.55));
     canvas.width  = W;
     canvas.height = H;
     canvasW.current = W;
