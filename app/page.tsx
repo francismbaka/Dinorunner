@@ -288,16 +288,16 @@ export default function Home() {
   }, [setMiniAppReady]);
 
   useEffect(() => {
-    const container = containerRef.current;
-    const canvas    = canvasRef.current;
-    if (!container || !canvas) return;
+  const container = containerRef.current;
+  const canvas    = canvasRef.current;
+  if (!container || !canvas) return;
+
+  function resize() {
     const insets = context?.client?.safeAreaInsets ?? { top: 0, bottom: 0, left: 0, right: 0 };
-    const W    = container.offsetWidth;
-    const maxH = window.innerHeight - insets.top - insets.bottom - 60;
-    const isMobile = W <= 430;
-    const H = isMobile
-      ? Math.min(maxH, Math.floor(window.innerHeight * 0.78))
-      : Math.min(maxH, Math.floor(W * 0.55));
+    const W    = container.offsetWidth || window.innerWidth;
+    const rawH = window.innerHeight || document.documentElement.clientHeight;
+    const maxH = Math.max(rawH - insets.top - insets.bottom - 60, 200); // never collapse to 0
+    const H    = Math.min(maxH, Math.floor(W * 0.55));
     canvas.width  = W;
     canvas.height = H;
     canvasW.current = W;
@@ -305,7 +305,19 @@ export default function Home() {
     groundY.current = Math.floor(H * GROUND_RATIO);
     dinoX.current   = Math.floor(W * 0.1);
     gameStateRef.current = makeInitialState(groundY.current);
-  }, [context]);
+  }
+
+  resize();
+  // Retry once shortly after — covers the case where Base App's native
+  // context/layout data arrives a beat after first paint
+  const retryTimer = setTimeout(resize, 300);
+  window.addEventListener("resize", resize);
+
+  return () => {
+    clearTimeout(retryTimer);
+    window.removeEventListener("resize", resize);
+  };
+}, [context]);
 
   // ─── Schedule helpers ──────────────────────────────────────────────────────
   const scheduleNextSpawn = useCallback((g: GameState) => {
