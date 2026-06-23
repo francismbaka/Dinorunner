@@ -125,7 +125,10 @@ function makeInitialState(groundY: number): GameState {
 class AudioEngine {
   private ctx: AudioContext | null = null;
   private getCtx(): AudioContext {
-    if (!this.ctx) this.ctx = new AudioContext();
+    if (!this.ctx) {
+      const AudioCtor = (window.AudioContext || (window as any).webkitAudioContext) as typeof AudioContext;
+      this.ctx = new AudioCtor();
+    }
     return this.ctx;
   }
   resume() { try { this.ctx?.resume(); } catch {} }
@@ -883,8 +886,8 @@ const toggleMute = useCallback(() => {
   const submitLabel = isWritePending ? "Confirm in wallet..." : "Submit Score Onchain";
 
   return (
-    <div style={{
-      width: "100%", height: "100svh", display: "flex", flexDirection: "column",
+    <div className="game-root" style={{
+  width: "100%", display: "flex", flexDirection: "column",
       background: "linear-gradient(160deg, #0f0c29 0%, #302b63 60%, #24243e 100%)",
       paddingTop: insets.top, paddingBottom: insets.bottom,
       paddingLeft: insets.left, paddingRight: insets.right,
