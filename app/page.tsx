@@ -281,6 +281,7 @@ export default function Home() {
   const [, setTick]   = useState(0);
   const [muted,           setMuted]           = useState(false);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
+  const [viewportH, setViewportH] = useState<number | null>(null);
 
   const isGameOver = gameStateRef.current.gameOver;
   const isWon      = gameStateRef.current.won;
@@ -289,6 +290,26 @@ export default function Home() {
     setMiniAppReady();
     audioRef.current = new AudioEngine();
   }, [setMiniAppReady]);
+
+  // ─── Viewport height in JS px, not CSS vh/dvh. Some in-app WebViews
+  //     (Base App included) don't reliably honor vh/dvh, which lets
+  //     `.game-root` shrink to `auto` and collapses the flex:1 canvas
+  //     area to 0 height while sibling header/footer still render. ────────
+  useEffect(() => {
+    function updateViewportHeight() {
+      const h = window.visualViewport?.height || window.innerHeight || document.documentElement.clientHeight;
+      if (h > 0) setViewportH(h);
+    }
+    updateViewportHeight();
+    const retryTimer = setTimeout(updateViewportHeight, 300);
+    window.addEventListener("resize", updateViewportHeight);
+    window.visualViewport?.addEventListener("resize", updateViewportHeight);
+    return () => {
+      clearTimeout(retryTimer);
+      window.removeEventListener("resize", updateViewportHeight);
+      window.visualViewport?.removeEventListener("resize", updateViewportHeight);
+    };
+  }, []);
 
   useEffect(() => {
   const container = containerRef.current;
@@ -315,10 +336,27 @@ export default function Home() {
   // Retry once shortly after — covers the case where Base App's native
   // context/layout data arrives a beat after first paint
   const retryTimer = setTimeout(resize, 300);
+
+  // Container's box may stay 0×0 a while longer if the WebView is slow to
+  // settle layout (no window "resize" event fires for that). Poll until it
+  // has real size, then fall back to normal resize-event handling.
+  let pollFrame: number | undefined;
+  let pollAttempts = 0;
+  function pollUntilSized() {
+    if (container!.offsetWidth > 0 && container!.offsetHeight > 0) {
+      resize();
+      return;
+    }
+    if (pollAttempts++ > 300) return; // give up after ~5s at 60fps
+    pollFrame = requestAnimationFrame(pollUntilSized);
+  }
+  pollUntilSized();
+
   window.addEventListener("resize", resize);
 
   return () => {
     clearTimeout(retryTimer);
+    if (pollFrame) cancelAnimationFrame(pollFrame);
     window.removeEventListener("resize", resize);
   };
 }, [context]);
@@ -889,6 +927,7 @@ const toggleMute = useCallback(() => {
   return (
     <div className="game-root" style={{
   width: "100%", display: "flex", flexDirection: "column",
+      height: viewportH ? `${viewportH}px` : undefined,
       background: "linear-gradient(160deg, #0f0c29 0%, #302b63 60%, #24243e 100%)",
       paddingTop: insets.top, paddingBottom: insets.bottom,
       paddingLeft: insets.left, paddingRight: insets.right,
